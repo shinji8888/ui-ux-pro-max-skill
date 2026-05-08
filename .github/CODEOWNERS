@@ -1,0 +1,20 @@
+# CODEOWNERS for shinji8888/ui-ux-pro-max-skill
+# 各 PR で自動レビュアーになるオーナーを定義します。
+# 詳細: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner (fallback)
+*                                @shinji8888
+
+# CI / build / repo automation
+/.github/                        @shinji8888
+/cli/                            @shinji8888
+
+# Skill source of truth
+/src/ui-ux-pro-max/              @shinji8888
+/src/ui-ux-pro-max/data/         @shinji8888
+/src/ui-ux-pro-max/scripts/      @shinji8888
+/src/ui-ux-pro-max/templates/    @shinji8888
+
+# Documentation
+/README.md                       @shinji8888
+/CLAUDE.md                       @shinji8888
