@@ -1,0 +1,76 @@
+name: CSV Validate
+
+on:
+  pull_request:
+    paths:
+      - 'src/ui-ux-pro-max/data/**.csv'
+      - 'cli/assets/data/**.csv'
+      - '.claude/skills/ui-ux-pro-max/data/**.csv'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/ui-ux-pro-max/data/**.csv'
+      - 'cli/assets/data/**.csv'
+      - '.claude/skills/ui-ux-pro-max/data/**.csv'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate CSV files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate CSV structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import csv, glob, os, sys
+          patterns = [
+              'src/ui-ux-pro-max/data/*.csv',
+              'cli/assets/data/*.csv',
+              '.claude/skills/ui-ux-pro-max/data/*.csv',
+          ]
+          files = []
+          for p in patterns:
+              files.extend(glob.glob(p))
+          if not files:
+              print('No CSV files matched. Skipping.')
+              sys.exit(0)
+          errors = []
+          for f in files:
+              try:
+                  with open(f, newline='', encoding='utf-8') as fp:
+                      reader = csv.reader(fp)
+                      rows = list(reader)
+                  if not rows:
+                      errors.append(f'{f}: empty file')
+                      continue
+                  header = rows[0]
+                  ncols = len(header)
+                  if ncols == 0:
+                      errors.append(f'{f}: empty header')
+                      continue
+                  for i, r in enumerate(rows[1:], start=2):
+                      if len(r) != ncols:
+                          errors.append(f'{f}:{i}: column count mismatch ({len(r)} vs {ncols})')
+                  ids = [r[0] for r in rows[1:] if r]
+                  dups = {x for x in ids if ids.count(x) > 1}
+                  if dups:
+                      errors.append(f'{f}: duplicate ids in first column: {sorted(dups)[:5]}')
+                  print(f'OK {f} ({len(rows)-1} rows, {ncols} cols)')
+              except Exception as e:
+                  errors.append(f'{f}: {e}')
+          if errors:
+              print('CSV validation failed:')
+              for e in errors:
+                  print(f'  - {e}')
+              sys.exit(1)
+          print(f'All {len(files)} CSV files passed validation.')
+          PY
