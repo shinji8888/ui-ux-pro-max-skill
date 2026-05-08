@@ -1,0 +1,40 @@
+name: Upstream Sync
+
+on:
+  schedule:
+    - cron: '0 18 * * *' # daily 03:00 JST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync main with upstream
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.UPSTREAM_SYNC_TOKEN || github.token }}
+
+      - name: Configure git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git
+
+      - name: Fetch upstream
+        run: git fetch upstream main --tags
+
+      - name: Fast-forward main from upstream
+        run: |
+          git checkout main
+          git merge --ff-only upstream/main
+
+      - name: Push to fork
+        run: git push origin main --tags

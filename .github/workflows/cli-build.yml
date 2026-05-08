@@ -1,0 +1,48 @@
+name: CLI Build & Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'cli/**'
+      - 'src/ui-ux-pro-max/**'
+      - '.github/workflows/cli-build.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'cli/**'
+      - 'src/ui-ux-pro-max/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build CLI and smoke test init
+    runs-on: ubuntu-latest
+    if: hashFiles('cli/package.json') != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        working-directory: cli
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Build CLI
+        working-directory: cli
+        run: bun run build
+
+      - name: Smoke test (offline init)
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/uipro-smoke
+          cd /tmp/uipro-smoke
+          node ${{ github.workspace }}/cli/dist/index.js init --ai claude --offline
+          test -d .claude/skills/ui-ux-pro-max || (echo 'skill dir missing'; exit 1)
+          echo 'Smoke test OK'
