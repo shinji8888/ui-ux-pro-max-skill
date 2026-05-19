@@ -19,6 +19,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import unquote
 from core import search, DATA_DIR
 
 
@@ -491,19 +492,27 @@ def generate_design_system(query: str, project_name: str = None, output_format: 
 # ============ PERSISTENCE FUNCTIONS ============
 def _contains_path_traversal(value: str) -> bool:
     """Detect explicit traversal attempts in user-controlled path segments."""
-    return ".." in str(value)
+    decoded_value = unquote(str(value))
+    parts = re.split(r"[\\/]+", decoded_value)
+    return any(part == ".." for part in parts)
 
 
 def _safe_slug(value: str, default: str = "default") -> str:
     """Create a filesystem-safe slug from user input."""
     slug = re.sub(r'[^a-z0-9_-]+', '-', str(value).lower()).strip("-_")
+    if len(slug) > 80:
+        slug = slug[:80].rstrip("-_")
+    if slug.upper() in {"CON", "PRN", "AUX", "NUL"}:
+        slug = f"{slug.lower()}-safe"
     return slug or default
 
 
 def _assert_within_base(target: Path, base: Path) -> None:
     """Ensure a resolved path remains inside the resolved base directory."""
+    target_resolved = target.resolve()
+    base_resolved = base.resolve()
     try:
-        target.relative_to(base)
+        target_resolved.relative_to(base_resolved)
     except ValueError as exc:
         raise PermissionError("Security: Attempted path traversal detected.") from exc
 

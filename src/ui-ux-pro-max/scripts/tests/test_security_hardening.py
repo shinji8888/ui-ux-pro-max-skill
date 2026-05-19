@@ -31,14 +31,15 @@ class SecurityHardeningTests(unittest.TestCase):
                 page_query="Checkout flow",
             )
             created_files = result["created_files"]
-            self.assertTrue(any("design-system/my-project-2026/MASTER.md" in path for path in created_files))
-            self.assertTrue(any("design-system/my-project-2026/pages/checkout-main.md" in path for path in created_files))
+            path_parts = [Path(path).parts for path in created_files]
+            self.assertIn(("design-system", "my-project-2026", "MASTER.md"), [parts[-3:] for parts in path_parts])
+            self.assertIn(("my-project-2026", "pages", "checkout-main.md"), [parts[-3:] for parts in path_parts])
 
     def test_persist_design_system_raises_on_traversal_attempt(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             with self.assertRaises(PermissionError):
                 persist_design_system(
-                    {"project_name": "../evil"},
+                    {"project_name": "%2e%2e/evil"},
                     output_dir=tmpdir,
                 )
 
