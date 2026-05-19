@@ -34,6 +34,9 @@ SEARCH_CONFIG = {
     "typography": {"max_results": 2}
 }
 
+MAX_SLUG_LENGTH = 80
+WINDOWS_RESERVED_NAME_RE = re.compile(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:-|$)", re.IGNORECASE)
+
 
 # ============ DESIGN SYSTEM GENERATOR ============
 class DesignSystemGenerator:
@@ -500,9 +503,9 @@ def _contains_path_traversal(value: str) -> bool:
 def _safe_slug(value: str, default: str = "default") -> str:
     """Create a filesystem-safe slug from user input."""
     slug = re.sub(r'[^a-z0-9_-]+', '-', str(value).lower()).strip("-_")
-    if len(slug) > 80:
-        slug = slug[:80].rstrip("-_")
-    if slug.upper() in {"CON", "PRN", "AUX", "NUL"}:
+    if len(slug) > MAX_SLUG_LENGTH:
+        slug = slug[:MAX_SLUG_LENGTH].rstrip("-_")
+    if WINDOWS_RESERVED_NAME_RE.match(slug):
         slug = f"{slug.lower()}-safe"
     return slug or default
 
