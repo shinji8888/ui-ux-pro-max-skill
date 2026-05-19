@@ -35,6 +35,7 @@ SEARCH_CONFIG = {
 }
 
 MAX_SLUG_LENGTH = 80
+MAX_URL_DECODE_ITERATIONS = 5
 WINDOWS_RESERVED_NAME_RE = re.compile(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:-|$)", re.IGNORECASE)
 WINDOWS_RESERVED_RAW_RE = re.compile(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$", re.IGNORECASE)
 
@@ -497,7 +498,7 @@ def generate_design_system(query: str, project_name: str = None, output_format: 
 def _contains_path_traversal(value: str) -> bool:
     """Detect explicit traversal attempts in user-controlled path segments."""
     decoded_value = str(value)
-    for _ in range(5):
+    for _ in range(MAX_URL_DECODE_ITERATIONS):
         next_value = unquote(decoded_value)
         if next_value == decoded_value:
             break
@@ -508,11 +509,12 @@ def _contains_path_traversal(value: str) -> bool:
 
 def _safe_slug(value: str, default: str = "default") -> str:
     """Create a filesystem-safe slug from user input."""
-    raw_basename = re.split(r"[\\/]+", str(value).strip())[-1]
+    value_str = str(value)
+    raw_basename = re.split(r"[\\/]+", value_str.strip())[-1]
     if WINDOWS_RESERVED_RAW_RE.match(raw_basename):
         return default
 
-    slug = re.sub(r'[^a-z0-9_-]+', '-', str(value).lower()).strip("-_")
+    slug = re.sub(r'[^a-z0-9_-]+', '-', value_str.lower()).strip("-_")
     if len(slug) > MAX_SLUG_LENGTH:
         slug = slug[:MAX_SLUG_LENGTH].rstrip("-_")
     if WINDOWS_RESERVED_NAME_RE.match(slug):
@@ -543,7 +545,7 @@ def persist_design_system(design_system: dict, page: str = None, output_dir: str
     Returns:
         dict with created file paths and status
     """
-    base_dir = (Path(output_dir).expanduser() if output_dir else Path.cwd()).resolve()
+    base_dir = (Path(output_dir) if output_dir else Path.cwd()).resolve()
     
     # Use project name for project-specific folder
     project_name = design_system.get("project_name", "default")
