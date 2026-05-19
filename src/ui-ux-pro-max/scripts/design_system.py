@@ -519,6 +519,8 @@ def _safe_slug(value: str, default: str = "default") -> str:
         slug = slug[:MAX_SLUG_LENGTH].rstrip("-_")
     if WINDOWS_RESERVED_NAME_RE.match(slug):
         slug = f"{slug}-safe"
+        if len(slug) > MAX_SLUG_LENGTH:
+            slug = slug[:MAX_SLUG_LENGTH].rstrip("-_")
     return slug or default
 
 
