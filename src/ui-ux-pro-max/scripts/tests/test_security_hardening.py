@@ -30,10 +30,11 @@ class SecurityHardeningTests(unittest.TestCase):
                 output_dir=tmpdir,
                 page_query="Checkout flow",
             )
-            created_files = result["created_files"]
-            path_parts = [Path(path).parts for path in created_files]
-            self.assertIn(("design-system", "my-project-2026", "MASTER.md"), [parts[-3:] for parts in path_parts])
-            self.assertIn(("my-project-2026", "pages", "checkout-main.md"), [parts[-3:] for parts in path_parts])
+            created_files = {Path(path) for path in result["created_files"]}
+            expected_master = Path(tmpdir) / "design-system" / "my-project-2026" / "MASTER.md"
+            expected_page = Path(tmpdir) / "design-system" / "my-project-2026" / "pages" / "checkout-main.md"
+            self.assertIn(expected_master, created_files)
+            self.assertIn(expected_page, created_files)
 
     def test_persist_design_system_raises_on_traversal_attempt(self):
         with tempfile.TemporaryDirectory() as tmpdir:

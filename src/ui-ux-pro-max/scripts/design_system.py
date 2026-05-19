@@ -506,7 +506,7 @@ def _safe_slug(value: str, default: str = "default") -> str:
     if len(slug) > MAX_SLUG_LENGTH:
         slug = slug[:MAX_SLUG_LENGTH].rstrip("-_")
     if WINDOWS_RESERVED_NAME_RE.match(slug):
-        slug = f"{slug.lower()}-safe"
+        slug = f"{slug}-safe"
     return slug or default
 
 
@@ -544,7 +544,7 @@ def persist_design_system(design_system: dict, page: str = None, output_dir: str
     design_system_dir = (base_dir / "design-system" / project_slug).resolve()
     pages_dir = (design_system_dir / "pages").resolve()
     _assert_within_base(design_system_dir, base_dir)
-    _assert_within_base(pages_dir, base_dir)
+    _assert_within_base(pages_dir, design_system_dir)
     
     created_files = []
     
