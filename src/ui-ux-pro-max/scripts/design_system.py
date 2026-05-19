@@ -16,8 +16,10 @@ Usage:
 import csv
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import unquote
 from core import search, DATA_DIR
 
 
@@ -31,6 +33,11 @@ SEARCH_CONFIG = {
     "landing": {"max_results": 2},
     "typography": {"max_results": 2}
 }
+
+MAX_SLUG_LENGTH = 80
+MAX_URL_DECODE_ITERATIONS = 5
+WINDOWS_RESERVED_NAME_RE = re.compile(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:-|$)", re.IGNORECASE)
+WINDOWS_RESERVED_RAW_RE = re.compile(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$", re.IGNORECASE)
 
 
 # ============ DESIGN SYSTEM GENERATOR ============
@@ -488,6 +495,45 @@ def generate_design_system(query: str, project_name: str = None, output_format: 
 
 
 # ============ PERSISTENCE FUNCTIONS ============
+def _contains_path_traversal(value: str) -> bool:
+    """Detect explicit traversal attempts in user-controlled path segments."""
+    decoded_value = str(value)
+    for _ in range(MAX_URL_DECODE_ITERATIONS):
+        next_value = unquote(decoded_value)
+        if next_value == decoded_value:
+            break
+        decoded_value = next_value
+    parts = re.split(r"[\\/]+", decoded_value)
+    return any(part == ".." for part in parts)
+
+
+def _safe_slug(value: str, default: str = "default") -> str:
+    """Create a filesystem-safe slug from user input."""
+    value_str = str(value)
+    raw_basename = re.split(r"[\\/]+", value_str.strip())[-1]
+    if WINDOWS_RESERVED_RAW_RE.match(raw_basename):
+        return default
+
+    slug = re.sub(r'[^a-z0-9_-]+', '-', value_str.lower()).strip("-_")
+    if len(slug) > MAX_SLUG_LENGTH:
+        slug = slug[:MAX_SLUG_LENGTH].rstrip("-_")
+    if WINDOWS_RESERVED_NAME_RE.match(slug):
+        slug = f"{slug}-safe"
+        if len(slug) > MAX_SLUG_LENGTH:
+            slug = slug[:MAX_SLUG_LENGTH].rstrip("-_")
+    return slug or default
+
+
+def _assert_within_base(target: Path, base: Path) -> None:
+    """Ensure a resolved path remains inside the resolved base directory."""
+    target_resolved = target.resolve()
+    base_resolved = base.resolve()
+    try:
+        target_resolved.relative_to(base_resolved)
+    except ValueError as exc:
+        raise PermissionError("Security: Attempted path traversal detected.") from exc
+
+
 def persist_design_system(design_system: dict, page: str = None, output_dir: str = None, page_query: str = None) -> dict:
     """
     Persist design system to design-system/<project>/ folder using Master + Overrides pattern.
@@ -501,14 +547,18 @@ def persist_design_system(design_system: dict, page: str = None, output_dir: str
     Returns:
         dict with created file paths and status
     """
-    base_dir = Path(output_dir) if output_dir else Path.cwd()
+    base_dir = (Path(output_dir) if output_dir else Path.cwd()).resolve()
     
     # Use project name for project-specific folder
     project_name = design_system.get("project_name", "default")
-    project_slug = project_name.lower().replace(' ', '-')
+    if _contains_path_traversal(project_name):
+        raise PermissionError("Security: Attempted path traversal detected.")
+    project_slug = _safe_slug(project_name, default="default")
     
-    design_system_dir = base_dir / "design-system" / project_slug
-    pages_dir = design_system_dir / "pages"
+    design_system_dir = (base_dir / "design-system" / project_slug).resolve()
+    pages_dir = (design_system_dir / "pages").resolve()
+    _assert_within_base(design_system_dir, base_dir)
+    _assert_within_base(pages_dir, design_system_dir)
     
     created_files = []
     
@@ -526,7 +576,11 @@ def persist_design_system(design_system: dict, page: str = None, output_dir: str
     
     # If page is specified, create page override file with intelligent content
     if page:
-        page_file = pages_dir / f"{page.lower().replace(' ', '-')}.md"
+        if _contains_path_traversal(page):
+            raise PermissionError("Security: Attempted path traversal detected.")
+        page_filename = _safe_slug(page, default="page")
+        page_file = (pages_dir / f"{page_filename}.md").resolve()
+        _assert_within_base(page_file, base_dir)
         page_content = format_page_override_md(design_system, page, page_query)
         with open(page_file, 'w', encoding='utf-8') as f:
             f.write(page_content)
