@@ -44,6 +44,16 @@ class SecurityHardeningTests(unittest.TestCase):
                     output_dir=tmpdir,
                 )
 
+    def test_persist_design_system_blocks_windows_reserved_names(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = persist_design_system(
+                {"project_name": "CON.txt"},
+                output_dir=tmpdir,
+            )
+            created_files = {Path(path) for path in result["created_files"]}
+            expected_master = Path(tmpdir) / "design-system" / "default" / "MASTER.md"
+            self.assertIn(expected_master, created_files)
+
 
 if __name__ == "__main__":
     unittest.main()
